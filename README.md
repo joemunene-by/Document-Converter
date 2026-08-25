@@ -54,14 +54,26 @@ If you only want a desktop shortcut that launches the Python UI (without buildin
 
 ## Additional format support
 
-This converter now includes a fallback converter that attempts to handle many additional file formats (for example: `.odt`, `.rtf`, `.epub`, `.pub`, `.tex`, `.ods`, `.xls`, `.ppt`) by using either `pypandoc` (if installed) or a system LibreOffice installation.
+This converter now attempts to handle many additional input formats (for example: `.odt`, `.rtf`, `.epub`, `.pub`, `.tex`, `.ods`, `.xls`, `.ppt`) using one of two fallbacks:
 
-To get the broadest format coverage, install LibreOffice on your system and ensure `soffice` is on your PATH. On Windows, the LibreOffice installer is available at https://www.libreoffice.org/
+- pypandoc (Python wrapper for pandoc) if available in the current Python environment
+- LibreOffice / `soffice` in headless mode if installed on the system
 
-If you plan to use `pypandoc`, install it in your environment:
+How it works:
+
+- For formats that the project has native readers/writers for (plain text, `.docx`, `.pdf`, `.md`, `.html`, `.xlsx`, `.pptx`) the built-in code is used.
+- If an input extension is not natively supported, the converter will try `pypandoc` first to convert the file to a sensible intermediate format (`docx` or `txt`). If `pypandoc` is not available, it will try LibreOffice's headless `soffice --convert-to` to produce an intermediate file that the converter can read.
+
+Recommendations:
+
+- To get the broadest format coverage, install LibreOffice and ensure `soffice` is on your PATH. Download from https://www.libreoffice.org/ and enable the program's installation path in your system PATH environment variable.
+- Optionally install `pypandoc` in your Python environment for faster, dependency-light conversions from formats supported by pandoc:
 
 ```powershell
 pip install pypandoc
 ```
 
-The fallback converter will attempt to convert unsupported inputs to an intermediate format (usually `docx` or `txt`) and then continue the conversion flow. This avoids adding heavy Python-only dependencies while providing wide format coverage.
+Notes:
+
+- The external fallback is best-effort: some complex formats (notably `.pub`/Publisher files) may not convert perfectly. When possible, prefer native file types.
+- The converter will show in the GUI when it's falling back to an external tool and present common output options.

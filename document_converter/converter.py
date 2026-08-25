@@ -47,16 +47,8 @@ class DocumentConverter:
         "html": "html",
         "md": "markdown",
         "markdown": "markdown",
-        # Extra input extensions (mapped to nearest internal format)
-        "odt": "docx",
-        "rtf": "docx",
-        "epub": "docx",
-        "pub": "docx",
-        "tex": "docx",
-        "ods": "xlsx",
-        "xls": "xlsx",
-        "ppt": "pptx",
     }
+
 
     CONVERSIONS = {
         "txt": ["docx", "pdf", "html", "markdown", "xlsx", "pptx"],
@@ -273,6 +265,20 @@ class DocumentConverter:
     def list_conversions(self):
         """Return available conversions."""
         return dict(self.CONVERSIONS)
+
+    def can_use_external(self) -> bool:
+        """Return True if an external conversion tool is available (pypandoc or LibreOffice)."""
+        try:
+            import pypandoc  # type: ignore
+            return True
+        except Exception:
+            pass
+
+        # Check for LibreOffice/soffice on PATH
+        for cmd in ("soffice", "soffice.exe", "libreoffice", "libreoffice.bin"):
+            if shutil.which(cmd):
+                return True
+        return False
 
     # --- External conversion helpers ---
     def _attempt_external_conversion(self, input_path: Path, target_ext: str):

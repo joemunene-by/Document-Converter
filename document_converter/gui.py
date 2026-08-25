@@ -104,8 +104,19 @@ class ConverterApp:
         conversions = self.converter.CONVERSIONS.get(format_name, [])
         # Also add the format itself if reading
         all_targets = list(set(conversions))
-        # If there are no direct conversions, inform the user about supported input formats
+        # If there are no direct conversions, check if an external converter is available
         if not all_targets:
+            # If the converter can use external tools, offer common target formats and inform the user
+            if self.converter.can_use_external():
+                common_targets = ["docx", "pdf", "html", "txt", "markdown"]
+                self.output_combo["values"] = common_targets
+                self.output_format_var.set(common_targets[0])
+                messagebox.showinfo(
+                    "Using external converter",
+                    f"Files with extension '.{input_ext}' will be converted using an external tool (LibreOffice or pypandoc).\nAvailable output formats: {', '.join(common_targets)}"
+                )
+                return
+
             supported_inputs = sorted(set(self.converter.EXTENSION_MAP.keys()))
             messagebox.showwarning(
                 "Unsupported format",
