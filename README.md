@@ -51,3 +51,17 @@ If you only want a desktop shortcut that launches the Python UI (without buildin
 
 - The GUI entrypoint is `document_converter/gui.py` and can also be run with `python document_converter\gui.py`.
 - The PowerShell scripts assume you run them from the project root on Windows and that PowerShell execution policy allows running local scripts.
+
+## Additional format support
+
+This converter now includes a fallback converter that attempts to handle many additional file formats (for example: `.odt`, `.rtf`, `.epub`, `.pub`, `.tex`, `.ods`, `.xls`, `.ppt`) by using either `pypandoc` (if installed) or a system LibreOffice installation.
+
+To get the broadest format coverage, install LibreOffice on your system and ensure `soffice` is on your PATH. On Windows, the LibreOffice installer is available at https://www.libreoffice.org/
+
+If you plan to use `pypandoc`, install it in your environment:
+
+```powershell
+pip install pypandoc
+```
+
+The fallback converter will attempt to convert unsupported inputs to an intermediate format (usually `docx` or `txt`) and then continue the conversion flow. This avoids adding heavy Python-only dependencies while providing wide format coverage.

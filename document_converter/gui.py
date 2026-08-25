@@ -104,6 +104,16 @@ class ConverterApp:
         conversions = self.converter.CONVERSIONS.get(format_name, [])
         # Also add the format itself if reading
         all_targets = list(set(conversions))
+        # If there are no direct conversions, inform the user about supported input formats
+        if not all_targets:
+            supported_inputs = sorted(set(self.converter.EXTENSION_MAP.keys()))
+            messagebox.showwarning(
+                "Unsupported format",
+                f"Files with extension '.{input_ext}' are not supported.\nSupported input extensions: {', '.join(supported_inputs)}"
+            )
+            self.output_combo["values"] = []
+            self.output_format_var.set("")
+            return
 
         self.output_combo["values"] = all_targets
         if all_targets:

@@ -2,6 +2,8 @@
 
 import os
 import tempfile
+import subprocess
+import shutil
 from pathlib import Path
 
 try:
@@ -45,6 +47,15 @@ class DocumentConverter:
         "html": "html",
         "md": "markdown",
         "markdown": "markdown",
+        # Extra input extensions (mapped to nearest internal format)
+        "odt": "docx",
+        "rtf": "docx",
+        "epub": "docx",
+        "pub": "docx",
+        "tex": "docx",
+        "ods": "xlsx",
+        "xls": "xlsx",
+        "ppt": "pptx",
     }
 
     CONVERSIONS = {
@@ -90,8 +101,24 @@ class DocumentConverter:
 
         # Map input extension to format name
         ext = self.EXTENSION_MAP.get(input_path.suffix.lstrip("."), input_path.suffix.lstrip("."))
+
+        # If we don't have a native reader for this extension, try an external converter
+        intermediate_used = None
+        converted_temp_path = None
         if ext not in self.readers:
-            raise ValueError(f"Unsupported input format: {ext}")
+            # prefer docx as intermediate when possible, otherwise txt
+            if "docx" in self.readers:
+                intermediate = "docx"
+                inter_ext = "docx"
+            else:
+                intermediate = "txt"
+                inter_ext = "txt"
+
+            converted_temp_path = self._attempt_external_conversion(input_path, inter_ext)
+            if converted_temp_path is None:
+                raise ValueError(f"Unsupported input format: {ext} and external conversion failed")
+
+            intermediate_used = intermediate
 
         if output_format not in self.CONVERSIONS.get(ext, []):
             raise ValueError(
@@ -100,8 +127,11 @@ class DocumentConverter:
                 f"{self.CONVERSIONS.get(ext, [])}"
             )
 
-        # Read the input document
-        content = self.readers[ext](input_path)
+        # Read the input document (use converted intermediate if present)
+        if intermediate_used is not None:
+            content = self.readers[intermediate_used](Path(converted_temp_path))
+        else:
+            content = self.readers[ext](input_path)
 
         # Write to output format
         writer = self.writers.get(output_format)
@@ -109,6 +139,13 @@ class DocumentConverter:
             raise ValueError(f"Writer not implemented for format: {output_format}")
 
         writer(content, output_path)
+
+        # cleanup temporary conversion file
+        if converted_temp_path:
+            try:
+                Path(converted_temp_path).unlink()
+            except Exception:
+                pass
 
     def _read_txt(self, path: Path) -> str:
         """Read text from a .txt file."""
@@ -236,3 +273,61 @@ class DocumentConverter:
     def list_conversions(self):
         """Return available conversions."""
         return dict(self.CONVERSIONS)
+
+    # --- External conversion helpers ---
+    def _attempt_external_conversion(self, input_path: Path, target_ext: str):
+        """Try to convert `input_path` to a file with extension `target_ext` using pypandoc or LibreOffice.
+
+        Returns the path to the converted file on success, or None on failure.
+        """
+        # Try pypandoc if available
+        try:
+            import pypandoc
+        except Exception:
+            pypandoc = None
+
+        tmpdir = tempfile.mkdtemp()
+        try:
+            out_name = input_path.stem + "." + target_ext
+            out_path = Path(tmpdir) / out_name
+
+            if pypandoc is not None:
+                try:
+                    pypandoc.convert_file(str(input_path), target_ext, outputfile=str(out_path))
+                    if out_path.exists():
+                        return str(out_path)
+                except Exception:
+                    pass
+
+            # Fall back to LibreOffice (soffice) headless conversion
+            soffice_cmd = None
+            for cmd in ("soffice", "soffice.exe", "libreoffice", "libreoffice.bin"):
+                if shutil.which(cmd):
+                    soffice_cmd = cmd
+                    break
+
+            if soffice_cmd:
+                try:
+                    subprocess.run([
+                        soffice_cmd,
+                        "--headless",
+                        "--convert-to",
+                        target_ext,
+                        "--outdir",
+                        str(tmpdir),
+                        str(input_path),
+                    ], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                    # converted file should now exist in tmpdir
+                    if out_path.exists():
+                        return str(out_path)
+                    # LibreOffice sometimes uses different output names/extensions; search tmpdir
+                    for f in Path(tmpdir).iterdir():
+                        if f.is_file() and f.stem == input_path.stem:
+                            return str(f)
+                except Exception:
+                    pass
+
+            return None
+        finally:
+            # Do not remove tmpdir here because caller may still read the returned file path; leave cleanup to caller
+            pass
