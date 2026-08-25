@@ -1,0 +1,18 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "document-converter"
+version = "0.1.0"
+description = "Universal document converter interconverting all document formats"
+requires-python = ">=3.8"
+dependencies = [
+    "pypdf>=6.0.0",
+    "python-docx>=1.2.0",
+    "markdown>=3.0.0",
+]
+
+[project.scripts]
+convert = "document_converter.cli:main"
+gui = "document_converter.gui:main"

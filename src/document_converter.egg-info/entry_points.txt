@@ -1,0 +1,3 @@
+[console_scripts]
+convert = document_converter.cli:main
+gui = document_converter.gui:main

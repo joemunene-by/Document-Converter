@@ -1,0 +1,7 @@
+pyproject.toml
+src/document_converter.egg-info/PKG-INFO
+src/document_converter.egg-info/SOURCES.txt
+src/document_converter.egg-info/dependency_links.txt
+src/document_converter.egg-info/entry_points.txt
+src/document_converter.egg-info/requires.txt
+src/document_converter.egg-info/top_level.txt
