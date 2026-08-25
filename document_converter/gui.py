@@ -4,6 +4,8 @@ import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
 from pathlib import Path
 from document_converter.converter import DocumentConverter
+import sys
+import subprocess
 
 
 class ConverterApp:
@@ -25,6 +27,13 @@ class ConverterApp:
         self.root.geometry("600x400")
 
         self.converter = DocumentConverter()
+
+        # Check for optional dependencies and offer to install them
+        try:
+            self._check_optional_dependencies()
+        except Exception:
+            # don't block the UI on check failures
+            pass
 
         self._create_widgets()
         self._setup_layout()
@@ -156,6 +165,46 @@ class ConverterApp:
         except Exception as e:
             self.status_var.set("Error occurred")
             messagebox.showerror("Error", f"Conversion failed:\n{e}")
+
+    def _check_optional_dependencies(self):
+        """Check for optional conversion dependencies and offer to install them."""
+        optional_packages = {
+            "pypdf": "PDF support",
+            "openpyxl": "Excel (.xlsx) support",
+            "pptx": "PowerPoint (.pptx) support (python-pptx)",
+            "pypandoc": "pandoc-based conversions (pypandoc)",
+        }
+
+        missing = []
+        for pkg in optional_packages.keys():
+            try:
+                __import__(pkg)
+            except Exception:
+                missing.append(pkg)
+
+        if not missing:
+            return
+
+        names = [optional_packages.get(p, p) for p in missing]
+        msg = (
+            "Optional packages are missing which enable additional conversions:\n\n"
+            + "\n".join(f"- {pkg}: {optional_packages.get(pkg)}" for pkg in missing)
+            + "\n\nInstall them now? (This runs pip in your active Python interpreter)")
+
+        install = messagebox.askyesno("Missing optional packages", msg)
+        if not install:
+            return
+
+        # Run pip install for the missing packages using the current interpreter
+        try:
+            cmd = [sys.executable, "-m", "pip", "install"] + missing
+            proc = subprocess.run(cmd, check=False)
+            if proc.returncode == 0:
+                messagebox.showinfo("Install complete", "Optional packages installed. Restart the app if needed.")
+            else:
+                messagebox.showwarning("Install failed", "Installing packages failed. See terminal for details.")
+        except Exception as ex:
+            messagebox.showerror("Install error", f"Failed to run installer: {ex}")
 
 
 def main():
