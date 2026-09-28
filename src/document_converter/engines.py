@@ -59,8 +59,12 @@ def pandoc_path() -> Optional[str]:
     candidates.append(shutil.which("pandoc"))
     # The bundled binary can be the wrong architecture (Intel pandoc on an M-series Mac without Rosetta).
     for exe in candidates:
-        if exe and Path(exe).exists() and _runs(exe):
-            return exe
+        if not exe:
+            continue
+        # pypandoc reports the Windows binary without its ".exe" suffix.
+        for path in (Path(exe), Path(exe + ".exe")):
+            if path.is_file() and _runs(str(path)):
+                return str(path)
     return None
 
 

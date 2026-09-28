@@ -179,3 +179,18 @@ def test_document_title_survives_markdown(sample, tmp_path):
     doc.save(str(src))
     out = converter.convert(src, "md", tmp_path)[0]
     assert out.read_text(encoding="utf-8").startswith("# Annual Report")
+
+
+def test_pandoc_found_when_reported_without_exe_suffix(tmp_path, monkeypatch):
+    import pypandoc
+
+    from document_converter import engines
+
+    (tmp_path / "pandoc.exe").write_bytes(b"")
+    monkeypatch.setattr(pypandoc, "get_pandoc_path", lambda: str(tmp_path / "pandoc"))
+    monkeypatch.setattr(engines, "_runs", lambda exe: True)
+    engines.pandoc_path.cache_clear()
+    try:
+        assert engines.pandoc_path() == str(tmp_path / "pandoc.exe")
+    finally:
+        engines.pandoc_path.cache_clear()
