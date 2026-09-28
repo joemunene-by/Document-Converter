@@ -1,0 +1,119 @@
+name: Release
+
+# Push a tag like v1.0.0 to build installers for every OS and publish a GitHub Release.
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            name: Windows
+          - os: macos-latest
+            name: macOS-Apple-Silicon
+          - os: macos-15-intel
+            name: macOS-Intel
+          - os: ubuntu-22.04
+            name: Linux
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install Qt system libraries
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libegl1 libxkbcommon0 libfontconfig1 libdbus-1-3
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          pip install . pyinstaller
+      - name: Use native Apple Silicon pandoc
+        # pypandoc-binary's macOS wheel ships an Intel pandoc, which needs Rosetta on M-series Macs.
+        if: runner.os == 'macOS' && runner.arch == 'ARM64'
+        run: |
+          PV=$(python -c "import pypandoc; print(pypandoc.get_pandoc_version())")
+          curl -fsSL -o pandoc.zip "https://github.com/jgm/pandoc/releases/download/$PV/pandoc-$PV-arm64-macOS.zip"
+          unzip -q pandoc.zip
+          DEST=$(python -c "import pypandoc; print(pypandoc.get_pandoc_path())")
+          cp "pandoc-$PV-arm64/bin/pandoc" "$DEST"
+          file "$DEST" | grep arm64
+      - name: Read version
+        id: v
+        shell: bash
+        run: echo "version=$(python -c 'import document_converter as d; print(d.__version__)')" >> "$GITHUB_OUTPUT"
+      - name: Build app
+        run: pyinstaller packaging/DocumentConverter.spec --noconfirm
+
+      - name: Smoke test (macOS, Linux)
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          if [ "$RUNNER_OS" = "macOS" ]; then BIN="dist/Document Converter.app/Contents/MacOS/DocumentConverter"; else BIN="dist/DocumentConverter/DocumentConverter"; fi
+          printf '# Smoke test\n\nHello from the build.\n' > smoke.md
+          "$BIN" smoke.md -t pdf
+          "$BIN" smoke.md -t docx
+          test -s smoke.pdf && test -s smoke.docx
+      - name: Smoke test (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          Set-Content smoke.md "# Smoke test`n`nHello from the build."
+          Start-Process -Wait -FilePath dist\DocumentConverter\DocumentConverter.exe -ArgumentList "smoke.md","-t","pdf"
+          if (-not (Test-Path smoke.pdf)) { throw "PDF was not produced" }
+
+      - name: Package (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          choco install innosetup --no-progress -y
+          & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" "/DAppVersion=${{ steps.v.outputs.version }}" packaging\windows\installer.iss
+          Compress-Archive -Path dist\DocumentConverter -DestinationPath "dist\DocumentConverter-Windows-Portable.zip"
+      - name: Package (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          mkdir -p dmg
+          cp -R "dist/Document Converter.app" dmg/
+          ln -s /Applications dmg/Applications
+          hdiutil create -volname "Document Converter" -srcfolder dmg -ov -format UDZO \
+            "dist/DocumentConverter-${{ matrix.name }}.dmg"
+      - name: Package (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          mkdir -p pkg/DocumentConverter-linux
+          cp -R dist/DocumentConverter pkg/DocumentConverter-linux/
+          cp packaging/linux/install.sh pkg/DocumentConverter-linux/
+          cp packaging/icon.png pkg/DocumentConverter-linux/document-converter.png
+          tar -C pkg -czf "dist/DocumentConverter-Linux-x86_64.tar.gz" DocumentConverter-linux
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.name }}
+          path: |
+            dist/*.exe
+            dist/*.zip
+            dist/*.dmg
+            dist/*.tar.gz
+
+  release:
+    needs: build
+    # Publish whatever built, even if one platform failed.
+    if: ${{ !cancelled() && startsWith(github.ref, 'refs/tags/') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: artifacts/*
+          generate_release_notes: true

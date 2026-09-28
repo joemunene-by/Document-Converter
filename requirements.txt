@@ -1,7 +1,9 @@
-pypdf>=6.0.0
-python-docx>=1.2.0
-markdown>=3.0.0
-# Optional (for broader fallback conversions):
-# pypandoc
-# openpyxl
-# python-pptx
+# Runtime dependencies (same as pyproject.toml). For development: pip install -e ".[dev]"
+PySide6-Essentials>=6.6
+pypandoc-binary>=1.13
+typst>=0.12
+pypdf>=4.0
+openpyxl>=3.1
+python-pptx>=0.6.23
+xlrd>=2.0
+odfpy>=1.4
