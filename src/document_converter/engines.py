@@ -37,8 +37,12 @@ def _run(cmd: List[str], cwd: Optional[Path] = None, timeout: int = 300) -> subp
 
 
 def _runs(exe: str) -> bool:
+    # Only macOS ships a wrong-architecture binary. Elsewhere, running it here would only slow
+    # startup, and a first launch can take a while while antivirus scans the executable.
+    if sys.platform != "darwin":
+        return True
     try:
-        return _run([exe, "--version"], timeout=30).returncode == 0
+        return _run([exe, "--version"], timeout=120).returncode == 0
     except (OSError, ConversionError):
         return False
 
@@ -65,7 +69,10 @@ def _pandoc_list(flag: str) -> Set[str]:
     exe = pandoc_path()
     if not exe:
         return set()
-    proc = _run([exe, flag], timeout=30)
+    try:
+        proc = _run([exe, flag], timeout=120)
+    except (OSError, ConversionError):
+        return set()
     return {line.strip() for line in proc.stdout.decode("utf-8", "replace").splitlines() if line.strip()}
 
 

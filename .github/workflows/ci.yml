@@ -30,5 +30,9 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -e ".[dev]"
+      - name: Show conversion engines
+        run: |
+          python -c "import pypandoc, os, subprocess; p = pypandoc.get_pandoc_path(); print('pypandoc path:', p, os.path.exists(p)); r = subprocess.run([p, '--version'], capture_output=True, text=True); print('exit', r.returncode, r.stdout[:40], r.stderr[:300])"
+          docconv --formats
       - name: Test
         run: pytest -q
