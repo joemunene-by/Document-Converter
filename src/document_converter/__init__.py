@@ -1,6 +1,6 @@
 """Document Converter: convert documents, spreadsheets, slides and markup files."""
 
-__version__ = "1.0.0"
+__version__ = "1.0.1"
 APP_NAME = "Document Converter"
 
 from .converter import Converter  # noqa: E402
